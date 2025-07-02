@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "599754105658",
+    "project_id": "chatstud-90488",
+    "storage_bucket": "chatstud-90488.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:599754105658:android:e127688ec5658819bba603",
+        "android_client_info": {
+          "package_name": "com.example.chatstud"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDb6gXpY2XzQJG3W-7sPd2c0e0ecBq_29Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
