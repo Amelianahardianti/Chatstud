@@ -1,6 +1,5 @@
 package com.example.chatstud
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,7 +9,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,42 +17,42 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+
 @Composable
-fun ChatScreen(onLogout: () -> Unit, onBack: () -> Unit) {
-    val auth = FirebaseAuth.getInstance()
-    val user = auth.currentUser
-    val context = LocalContext.current
+fun PrivateChatScreen(
+    currentUserEmail: String,
+    recipientEmail: String,
+    onBack: () -> Unit
+) {
     val db = FirebaseFirestore.getInstance()
+    var messageText by remember { mutableStateOf("") }
+    val messages = remember { mutableStateListOf<Message>() }
+    val chatId = listOf(currentUserEmail, recipientEmail).sorted().joinToString("_")
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
-    var messageText by remember { mutableStateOf("") }
-    val messages = remember { mutableStateListOf<Message>() }
-    val displayName = user?.displayName ?: user?.email?.substringBefore("@") ?: "Anon"
+    val currentUserName = currentUserEmail.substringBefore("@")
+    val recipientName = recipientEmail.substringBefore("@")
 
-    // Auto scroll to bottom when new message arrives
+    // biar bisa scroll
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             coroutineScope.launch {
-                listState.animateScrollToItem(0)
+                listState.animateScrollToItem(messages.size - 1)
             }
         }
     }
 
-    // Realtime listener
-    LaunchedEffect(Unit) {
-        db.collection("messages")
+    LaunchedEffect(chatId) {
+        db.collection("private_chats").document(chatId).collection("messages")
             .orderBy("timestamp", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, _ ->
                 messages.clear()
@@ -69,14 +67,14 @@ fun ChatScreen(onLogout: () -> Unit, onBack: () -> Unit) {
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
+                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.05f),
                         MaterialTheme.colorScheme.surface,
                         MaterialTheme.colorScheme.surface
                     )
                 )
             )
     ) {
-        // Header/TopAppBar
+        // Header
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surface,
@@ -86,10 +84,9 @@ fun ChatScreen(onLogout: () -> Unit, onBack: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Back button
+                // back button
                 IconButton(
                     onClick = onBack,
                     modifier = Modifier
@@ -104,63 +101,117 @@ fun ChatScreen(onLogout: () -> Unit, onBack: () -> Unit) {
                     )
                 }
 
-                // Title
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // buat recipient avatar
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.secondary,
+                                    MaterialTheme.colorScheme.tertiary
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Global Chat",
-                        style = MaterialTheme.typography.titleLarge.copy(
+                        text = recipientName.firstOrNull()?.toString()?.uppercase() ?: "?",
+                        style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    )
-                    Text(
-                        text = "${messages.size} pesan",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = Color.White
                         )
                     )
                 }
 
-                // Logout button
-                IconButton(
-                    onClick = {
-                        auth.signOut()
-                        Toast.makeText(context, "Berhasil logout", Toast.LENGTH_SHORT).show()
-                        onLogout()
-                    },
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // Recipient Info
+                Column(
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.ExitToApp,
-                        contentDescription = "Logout",
-                        tint = MaterialTheme.colorScheme.error
+                    Text(
+                        text = recipientName,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = recipientEmail,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
+
+                // Online status
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                )
             }
         }
 
         // Messages List
-        LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            state = listState,
-            reverseLayout = true,
-            contentPadding = PaddingValues(vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(messages.reversed()) { msg ->
-                MessageBubble(
-                    message = msg,
-                    isCurrentUser = msg.sender == user?.email,
-                    currentUserName = displayName
-                )
+        if (messages.isEmpty()) {
+            // Empty state
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "💬",
+                        fontSize = 48.sp
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Mulai percakapan dengan $recipientName",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Kirim pesan pertama Anda",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                state = listState,
+                contentPadding = PaddingValues(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(messages) { msg ->
+                    PrivateMessageBubble(
+                        message = msg,
+                        isCurrentUser = msg.sender == currentUserEmail,
+                        currentUserName = currentUserName,
+                        recipientName = recipientName
+                    )
+                }
             }
         }
 
@@ -184,7 +235,7 @@ fun ChatScreen(onLogout: () -> Unit, onBack: () -> Unit) {
                     modifier = Modifier.weight(1f),
                     placeholder = {
                         Text(
-                            "Ketik pesan...",
+                            "Kirim pesan ke $recipientName...",
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
                     },
@@ -199,14 +250,17 @@ fun ChatScreen(onLogout: () -> Unit, onBack: () -> Unit) {
                 // Send button
                 FloatingActionButton(
                     onClick = {
-                        if (messageText.isNotBlank() && user != null) {
+                        if (messageText.isNotBlank()) {
                             val msg = Message(
                                 text = messageText.trim(),
-                                sender = user.email ?: "Anon",
-                                displayName = displayName,
+                                sender = currentUserEmail,
+                                displayName = currentUserName,
                                 timestamp = System.currentTimeMillis()
                             )
-                            db.collection("messages").add(msg)
+                            db.collection("private_chats")
+                                .document(chatId)
+                                .collection("messages")
+                                .add(msg)
                             messageText = ""
                         }
                     },
@@ -232,20 +286,21 @@ fun ChatScreen(onLogout: () -> Unit, onBack: () -> Unit) {
 }
 
 @Composable
-private fun MessageBubble(
+private fun PrivateMessageBubble(
     message: Message,
     isCurrentUser: Boolean,
-    currentUserName: String
+    currentUserName: String,
+    recipientName: String
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isCurrentUser) Arrangement.End else Arrangement.Start
     ) {
         if (!isCurrentUser) {
-            // Avatar for other users
+            // Avatar for recipient
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
                     .background(
                         Brush.linearGradient(
@@ -258,8 +313,8 @@ private fun MessageBubble(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = message.displayName.firstOrNull()?.toString()?.uppercase() ?: "?",
-                    style = MaterialTheme.typography.labelLarge.copy(
+                    text = recipientName.firstOrNull()?.toString()?.uppercase() ?: "?",
+                    style = MaterialTheme.typography.labelMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
@@ -272,41 +327,29 @@ private fun MessageBubble(
             modifier = Modifier.widthIn(max = 280.dp),
             horizontalAlignment = if (isCurrentUser) Alignment.End else Alignment.Start
         ) {
-            // Sender name (only for other users)
-            if (!isCurrentUser) {
-                Text(
-                    text = message.displayName,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Medium
-                    ),
-                    modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
-                )
-            }
-
             // Message bubble
             Surface(
                 shape = RoundedCornerShape(
-                    topStart = if (isCurrentUser) 16.dp else 4.dp,
-                    topEnd = if (isCurrentUser) 4.dp else 16.dp,
-                    bottomStart = 16.dp,
-                    bottomEnd = 16.dp
+                    topStart = if (isCurrentUser) 20.dp else 4.dp,
+                    topEnd = if (isCurrentUser) 4.dp else 20.dp,
+                    bottomStart = 20.dp,
+                    bottomEnd = 20.dp
                 ),
                 color = if (isCurrentUser) {
                     MaterialTheme.colorScheme.primary
                 } else {
-                    MaterialTheme.colorScheme.surfaceVariant
+                    MaterialTheme.colorScheme.secondaryContainer
                 },
                 shadowElevation = 2.dp
             ) {
                 Text(
                     text = message.text,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     style = MaterialTheme.typography.bodyMedium.copy(
                         color = if (isCurrentUser) {
                             MaterialTheme.colorScheme.onPrimary
                         } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                            MaterialTheme.colorScheme.onSecondaryContainer
                         }
                     )
                 )
@@ -314,14 +357,14 @@ private fun MessageBubble(
 
             // Timestamp
             Text(
-                text = formatTimestamp(message.timestamp),
+                text = formatPrivateTimestamp(message.timestamp),
                 style = MaterialTheme.typography.labelSmall.copy(
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 ),
                 modifier = Modifier.padding(
                     start = if (isCurrentUser) 0.dp else 4.dp,
                     end = if (isCurrentUser) 4.dp else 0.dp,
-                    top = 2.dp
+                    top = 4.dp
                 )
             )
         }
@@ -331,7 +374,7 @@ private fun MessageBubble(
             // Avatar for current user
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
                     .background(
                         Brush.linearGradient(
@@ -345,7 +388,7 @@ private fun MessageBubble(
             ) {
                 Text(
                     text = currentUserName.firstOrNull()?.toString()?.uppercase() ?: "?",
-                    style = MaterialTheme.typography.labelLarge.copy(
+                    style = MaterialTheme.typography.labelMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
@@ -355,7 +398,7 @@ private fun MessageBubble(
     }
 }
 
-private fun formatTimestamp(timestamp: Long): String {
+private fun formatPrivateTimestamp(timestamp: Long): String {
     val now = System.currentTimeMillis()
     val diff = now - timestamp
 

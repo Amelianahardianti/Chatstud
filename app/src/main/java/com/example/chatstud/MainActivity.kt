@@ -4,8 +4,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.navigation.compose.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
 import com.example.chatstud.ui.theme.ChatstudTheme
 import com.google.firebase.auth.FirebaseAuth
 
@@ -52,21 +50,52 @@ class MainActivity : ComponentActivity() {
                             navController.navigate("auth") {
                                 popUpTo("globalChat") { inclusive = true }
                             }
+                        },
+                            onBack = {
+                            navController.popBackStack()
                         })
                     }
 
                     composable("privateChat") {
-                        // Placeholder dulu ntr buat
-                        Text("Private Chat Placeholder")
+                        val auth = FirebaseAuth.getInstance()
+                        val currentUser = auth.currentUser
+                        val currentUserEmail = currentUser?.email ?: ""
+
+                        Userfriend(
+                            currentUserEmail = currentUserEmail,
+                            onUserSelected = { selectedUserEmail ->
+                                navController.navigate("chatWith/${selectedUserEmail}")
+                            },
+                            onBack = {
+                                navController.popBackStack()
+                            }
+                        )
                     }
+
 
                     composable("profile") {
                         ProfileScreen(user = auth.currentUser) {
                             navController.popBackStack()
                         }
                     }
+
+                    composable("chatWith/{email}") { backStackEntry ->
+                        val currentUser = FirebaseAuth.getInstance().currentUser
+                        val currentUserEmail = currentUser?.email ?: ""
+                        val recipientEmail = backStackEntry.arguments?.getString("email") ?: ""
+
+                        PrivateChatScreen(
+                            currentUserEmail = currentUserEmail,
+                            recipientEmail = recipientEmail,
+                            onBack = {
+                                navController.popBackStack()
+                            }
+                        )
+                    }
+
                 }
             }
         }
     }
+
 }
